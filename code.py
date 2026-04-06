@@ -1,23 +1,31 @@
+import streamlit as st
+import re
 
-# G-quadruplex pattern
-pattern = r"G{3,}[ATGC]{1,7}G{3,}[ATGC]{1,7}G{3,}[ATGC]{1,7}G{3,}"
+st.title("G-Quadruplex Prediction Tool")
 
-matches = re.findall(pattern, sequence)
+dna = st.text_area("Enter DNA Sequence")
 
-# Sequence length
-length = len(sequence)
+if st.button("Analyze"):
+    if dna:
+        sequence = dna.upper().replace(" ", "")
 
-# GC Content
-gc_count = sequence.count("G") + sequence.count("C")
-gc_content = (gc_count / length) * 100 if length > 0 else 0
+        pattern = r"G{3,}[ATGC]{1,7}G{3,}[ATGC]{1,7}G{3,}[ATGC]{1,7}G{3,}"
+        matches = re.findall(pattern, sequence)
 
-print("\n--- Analysis Result ---")
-print("Sequence Length:", length)
-print("GC Content: {:.2f}%".format(gc_content))
+        length = len(sequence)
 
-if matches:
-    print("\nG-Quadruplex Motifs Found:")
-    for i, m in enumerate(matches, 1):
-        print(f"{i}. {m}")
-else:
-    print("\nNo G-Quadruplex motifs found.")
+        gc_count = sequence.count("G") + sequence.count("C")
+        gc_content = (gc_count / length) * 100 if length > 0 else 0
+
+        st.subheader("Results")
+        st.write("Sequence Length:", length)
+        st.write(f"GC Content: {gc_content:.2f}%")
+
+        if matches:
+            st.write("### G-Quadruplex Motifs Found:")
+            for i, m in enumerate(matches, 1):
+                st.write(f"{i}. {m}")
+        else:
+            st.write("No G-Quadruplex motifs found.")
+    else:
+        st.warning("Please enter a DNA sequence")
