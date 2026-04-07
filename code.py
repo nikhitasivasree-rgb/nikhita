@@ -32,7 +32,7 @@ if uploaded_file:
 if st.button("Use Example"):
     sequence = "GGGTTAGGGTTAGGGTTAGGG"
     st.rerun()
-if st.button("Analyze")
+if st.button("Analyze"):
     if not sequence:
         st.error("Please enter a sequence")
     else:
