@@ -1,12 +1,8 @@
-from flask import Flask, render_template, request, jsonify, send_file
+import streamlit as st
 import re
-import io
-import csv
-
-app = Flask(__name__)
 
 # -------------------------------
-# Utility Functions
+# Functions
 # -------------------------------
 
 def validate_sequence(seq):
@@ -24,10 +20,6 @@ def reverse_complement(seq):
 
 
 def find_g_quadruplex(seq):
-    """
-    Simple G4 motif pattern:
-    G{3,}N{1,7}G{3,}N{1,7}G{3,}N{1,7}G{3,}
-    """
     pattern = r"(G{3,}.{1,7}G{3,}.{1,7}G{3,}.{1,7}G{3,})"
     matches = [(m.start(), m.end(), m.group()) for m in re.finditer(pattern, seq)]
     return matches
@@ -39,89 +31,71 @@ def highlight_sequence(seq, motifs):
     for start, end, motif in motifs:
         start += offset
         end += offset
-        tag = f"<mark>{motif}</mark>"
+        tag = f"<span style='background-color:yellow'>{motif}</span>"
         highlighted = highlighted[:start] + tag + highlighted[end:]
         offset += len(tag) - len(motif)
     return highlighted
 
 
 # -------------------------------
-# Routes
+# UI
 # -------------------------------
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+st.set_page_config(page_title="G-Quadruplex Predictor", layout="centered")
 
+st.title("🧬 G-Quadruplex Prediction Tool")
 
-@app.route("/analyze", methods=["POST"])
-def analyze():
-    seq = request.form.get("sequence", "").upper().strip()
+# Input
+sequence = st.text_area("Enter DNA Sequence", height=150)
 
-    if not seq:
-        return jsonify({"error": "No sequence provided"})
+# File Upload
+uploaded_file = st.file_uploader("Upload sequence file (.txt)", type=["txt"])
 
-    if not validate_sequence(seq):
-        return jsonify({"error": "Invalid DNA sequence (only A, T, G, C allowed)"})
+if uploaded_file:
+    sequence = uploaded_file.read().decode("utf-8").replace("\n", "").upper()
+    st.success("File uploaded successfully!")
 
-    length = len(seq)
-    gc = gc_content(seq)
-    rev_comp = reverse_complement(seq)
-    motifs = find_g_quadruplex(seq)
+# Example Button
+if st.button("Use Example"):
+    sequence = "GGGTTAGGGTTAGGGTTAGGG"
+    st.rerun()
 
-    highlighted = highlight_sequence(seq, motifs) if motifs else seq
+# Analyze
+if st.button("Analyze"):
 
-    return jsonify({
-        "length": length,
-        "gc_content": gc,
-        "reverse_complement": rev_comp,
-        "motifs": motifs,
-        "highlighted_sequence": highlighted
-    })
+    if not sequence:
+        st.error("Please enter a sequence")
+    else:
+        seq = sequence.upper().strip()
 
+        if not validate_sequence(seq):
+            st.error("Invalid DNA sequence (only A, T, G, C allowed)")
+        else:
+            length = len(seq)
+            gc = gc_content(seq)
+            rev = reverse_complement(seq)
+            motifs = find_g_quadruplex(seq)
 
-@app.route("/upload", methods=["POST"])
-def upload_file():
-    file = request.files.get("file")
+            st.subheader("📊 Results")
 
-    if not file:
-        return jsonify({"error": "No file uploaded"})
+            col1, col2 = st.columns(2)
+            col1.metric("Sequence Length", length)
+            col2.metric("GC Content (%)", gc)
 
-    content = file.read().decode("utf-8")
-    seq = "".join(content.split()).upper()
+            st.write("🔁 Reverse Complement:")
+            st.code(rev)
 
-    if not validate_sequence(seq):
-        return jsonify({"error": "Invalid sequence in file"})
+            if motifs:
+                st.success(f"✅ Found {len(motifs)} G-Quadruplex motif(s)")
+                highlighted = highlight_sequence(seq, motifs)
+                st.markdown(highlighted, unsafe_allow_html=True)
 
-    return jsonify({"sequence": seq})
+                st.write("📍 Motif Positions:")
+                for m in motifs:
+                    st.write(f"Start: {m[0]}, End: {m[1]}, Motif: {m[2]}")
+            else:
+                st.warning("No G-Quadruplex motifs found.")
 
-
-@app.route("/download", methods=["POST"])
-def download():
-    data = request.json
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-
-    writer.writerow(["Metric", "Value"])
-    writer.writerow(["Sequence Length", data["length"]])
-    writer.writerow(["GC Content", data["gc_content"]])
-    writer.writerow(["Reverse Complement", data["reverse_complement"]])
-    writer.writerow(["Motif Count", len(data["motifs"])])
-
-    output.seek(0)
-
-    return send_file(
-        io.BytesIO(output.getvalue().encode()),
-        mimetype="text/csv",
-        as_attachment=True,
-        download_name="results.csv"
-    )
-
-
-# -------------------------------
-# Run App
-# -------------------------------
-
-if __name__ == "__main__":
-    app.run(debug=True)
+# Footer
+st.markdown("---")
+st.caption("Built with Streamlit 🧬")
